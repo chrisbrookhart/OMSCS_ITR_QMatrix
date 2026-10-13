@@ -8,3 +8,7 @@ __pycache__
 /excel-example.csv
 
 .ipynb_checkpoints/
+
+# Full-text extraction environment and local API secrets.
+/full_text_extraction/.venv/
+/full_text_extraction/.env
