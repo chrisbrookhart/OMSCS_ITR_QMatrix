@@ -32,7 +32,7 @@ Record the search date, query, filters, and displayed hit count in your search l
 Run from the repository root; the new tool uses only Python's standard library:
 
 ```bash
-python prepare_rayyan.py input/exports --baseline input/input.csv
+python prepare_rayyan.py input/exports --baseline input/20261008/input.csv
 ```
 
 The old CSV is an optional comparison baseline. It is no longer an input requirement for the native-export workflow. To check individual export counts, supply a CSV such as `input/export_counts.csv`:
@@ -46,7 +46,7 @@ PubMed/query1_batch1.nbib,120
 Paths are relative to `input/exports/`. Each expected count refers to that file's batch, not the total count across several batches. Replace these example counts with the numbers recorded during export.
 
 ```bash
-python prepare_rayyan.py input/exports --baseline input/input.csv --counts input/export_counts.csv
+python prepare_rayyan.py input/exports --baseline input/20261008/input.csv --counts input/export_counts.csv
 ```
 
 Outputs go into a new `output/rayyan_<timestamp>/` directory:

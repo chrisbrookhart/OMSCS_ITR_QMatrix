@@ -1,7 +1,7 @@
-"""Parse input/input.csv into one example-shaped CSV per database.
+"""Parse input/20261009/Candidate Records - Final Search.xlsx into one example-shaped CSV per database.
 
 Run: python parse_records.py
-Defaults: input/input.csv -> output/yyyymmdd_hhss/<database>.csv
+Defaults: input/20261009/Candidate Records - Final Search.xlsx -> output/yyyymmdd_hhss/<database>.csv
 Each record belongs to its alphabetically first database (case-insensitive).
 Unavailable bibliographic fields remain blank; no external lookup is performed.
 """
@@ -16,6 +16,8 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Mapping
+
+from candidate_workbook import DEFAULT_INPUT
 
 
 class Label(str, Enum):
@@ -159,6 +161,10 @@ class OutputRecord:
 
 
 def read_records(path: Path) -> list[SourceRecord]:
+    if path.suffix.lower() == ".xlsx":
+        from candidate_workbook import read_rows
+        return [SourceRecord.from_csv_row(row) for row in read_rows(path)]
+
     import pandas as pd
 
     # Read strings and preserve empty fields instead of converting them to NaN.
@@ -241,7 +247,7 @@ def write_records(records: list[SourceRecord], output_root: Path) -> Path:
 def main() -> None:
     # Parse command-line paths.
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", nargs="?", type=Path, default=Path("input/input.csv"))
+    parser.add_argument("input", nargs="?", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--output", type=Path, default=Path("output"))
     args = parser.parse_args()
 

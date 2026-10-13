@@ -19,7 +19,7 @@ Keep source code, search strings, search dates, aggregate counts, methodological
 
 Store downloaded records in `input/` and derived outputs in `output/`. Both directories, and the older root-level `input.csv` and `excel-example.csv` filenames, are ignored by Git. Ignoring a file prevents future additions; it does not remove files already present in commits.
 
-Tests should use synthetic records. The existing local `input/input.csv` can still serve as an optional baseline for the export audit, without being published.
+Tests should use synthetic records. The existing local `input/20261008/input.csv` can still serve as an optional baseline for the export audit, without being published.
 
 ## History cleanup
 

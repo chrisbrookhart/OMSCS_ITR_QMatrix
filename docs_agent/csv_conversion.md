@@ -16,7 +16,7 @@ The normal command is:
 uv run --no-project --with-requirements requirements.txt python parse_records.py
 ```
 
-The command reads `input/input.csv`, applies the shared title/abstract/keyword labeling rules, and writes one CSV per assigned database. To select another input or output location:
+The command reads `input/20261009/Candidate Records - Final Search.xlsx`, applies the shared title/abstract/keyword labeling rules, and writes one CSV per assigned database. To select another input or output location:
 
 ```bash
 uv run --no-project --with-requirements requirements.txt python parse_records.py other.csv --output outputs
@@ -26,7 +26,7 @@ Use `--help` to display the CLI arguments without processing records.
 
 ## Input and row structures
 
-The input must have the column names used by `input/input.csv`, including capitalization and spaces. `read_records()` uses pandas to read UTF-8 CSVs, including files with a byte-order mark. It reads cells as strings and preserves empty cells instead of converting them to `NaN`.
+The input must have the column names used by `input/20261009/Candidate Records - Final Search.xlsx`, including capitalization and spaces. `read_records()` reads the `Records` worksheet of XLSX files using Python’s standard library, or uses pandas to read UTF-8 CSVs, including files with a byte-order mark. It reads cells as strings and preserves empty cells instead of converting them to `NaN`.
 
 Each row becomes a frozen `SourceRecord` through `SourceRecord.from_csv_row()`:
 
