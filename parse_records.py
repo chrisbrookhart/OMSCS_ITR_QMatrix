@@ -46,7 +46,7 @@ def split_list(value: str) -> tuple[str, ...]:
 
 @dataclass(frozen=True)
 class SourceRecord:
-    """All columns from the original record; parsed lists are immutable."""
+    """Source columns with tuple-valued CSV lists and a separate label list."""
 
     id: str
     sept_id: str

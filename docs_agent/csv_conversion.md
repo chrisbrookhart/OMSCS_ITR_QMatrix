@@ -2,7 +2,7 @@
 
 For new manual searches, use the [native export and Rayyan workflow](rayyan_exports.md) and [Colab labeling notebook](colab.md) to preserve additional metadata without converting to this older CSV schema.
 
-`parse_records.py` converts the combined candidate records into one CSV per database. Output columns match `excel-example.csv`; each input record is assigned to its alphabetically first database.
+`parse_records.py` converts the combined candidate records into one CSV per database. Output columns match `input/excel-example.csv`; each input record is assigned to its alphabetically first database.
 
 ## Run from the repository root
 
@@ -33,10 +33,32 @@ Each row becomes a frozen `SourceRecord` through `SourceRecord.from_csv_row()`:
 - `Year` becomes an integer, or `None` when empty.
 - `Authors`, `Found in`, and `Keywords` become tuples split on semicolons. Whitespace around each entry is stripped; empty entries are removed.
 - Other source fields remain strings.
+- `labels` is a separate list of string-valued `Label` enum members. It starts empty when the optional `Labels` column is absent or blank. If supplied, that column uses semicolon-separated enum values; unknown values raise `ValueError`.
 
 `OutputRecord` is also a frozen dataclass. Its `from_record()` class method accepts a `SourceRecord` and creates the row in the new format. Frozen instances cannot be modified directly; use `dataclasses.replace()` if an update needs a new instance.
 
 The example CSV establishes the output shape. The script does not read it at runtime.
+
+## Labeling rules
+
+`get_labels(record)` uses the record's title, abstract, and keywords through the shared `get_labels_from_text()` function. The categories follow RQ1 and the data-type distinction in RQ2 of the [working doc](../docs_human/Check-in%202%20working%20doc.md):
+
+- Method families: expert-driven, statistical, machine learning, LLM-based.
+- Domains: educational measurement; intelligent tutoring systems and learning analytics; psychological and clinical assessment.
+- Tasks: Q-matrix generation, validation, refinement.
+- Data types: simulated data, empirical data.
+
+The patterns in `LABEL_PATTERNS` and `TASK_PATTERNS` make the rules editable. Matching ignores case and normalizes hyphens and whitespace. Task terms must occur within 100 characters of a Q-matrix or an equivalent mapping term in the same sentence or keyword. Multiple categories can match; duplicates are removed and labels follow enum declaration order.
+
+`update_records()` returns a new list of copied records with recomputed labels. It preserves the original records and their notes, replacing any previously supplied label list. CSV conversion appends the label values to output notes, using ` | ` only when an existing note is present. Records with no labels retain their original notes. Output headers still match the example CSV.
+
+These are descriptive keyword suggestions for review. A mention of a method may describe background work, and a domain term may have another meaning. The rules do not determine inclusion, exclusion, peer-review status, full-text availability, or the detailed extraction items in RQ2–RQ4. Absence of a matching term produces no label; labeling accuracy needs human review.
+
+Synthetic checks can be run without pandas:
+
+```bash
+python -m unittest test_parse_records -v
+```
 
 ## Column mapping
 
@@ -56,7 +78,7 @@ The rows below give the exact output column order.
 | `publisher` | Empty |
 | `url` | Empty |
 | `abstract` | `Abstract` |
-| `notes` | `Notes` |
+| `notes` | `Notes`, plus nonempty computed labels |
 | `doi` | `DOI`, preserved without normalization |
 | `keywords` | Parsed `Keywords`, joined with `;` |
 
