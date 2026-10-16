@@ -12,3 +12,5 @@ __pycache__
 # Full-text extraction environment and local API secrets.
 /full_text_extraction/.venv/
 /full_text_extraction/.env
+
+/full_text_extraction/config.py

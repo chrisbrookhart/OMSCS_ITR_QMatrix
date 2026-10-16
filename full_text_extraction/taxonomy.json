@@ -1,0 +1,247 @@
+{
+  "version": "0.2.0",
+  "source_document": "input/qmatrix_checkin_2.pdf",
+  "unit": "paper with dataset/experiment conditions retained in field values",
+  "fields": {
+    "title": {
+      "rq": "basic",
+      "description": "Title of this paper, not a cited work.",
+      "codes": [],
+      "value_type": "string"
+    },
+    "doi": {
+      "rq": "basic",
+      "description": "DOI of this paper, if present.",
+      "codes": [],
+      "value_type": "string"
+    },
+    "publication_year": {
+      "rq": "basic",
+      "description": "Publication year; distinguish first online year where explicitly reported.",
+      "codes": [],
+      "value_type": "integer"
+    },
+    "mapping_contribution": {
+      "rq": "screening",
+      "description": "Draft assessment of whether THIS study generates, validates, refines, only uses an existing item-attribute mapping, or is unrelated. Equivalent KC/skill models count. Do not confuse estimating CDM parameters with estimating a Q-matrix. Not a final eligibility decision.",
+      "codes": [
+        "generation",
+        "validation",
+        "refinement",
+        "uses_existing_only",
+        "unrelated",
+        "uncertain"
+      ],
+      "value_type": "enum_list"
+    },
+    "methods_investigated": {
+      "rq": "RQ1",
+      "description": "Names and brief descriptions of this study’s own mapping methods and comparators; distinguish their roles.",
+      "codes": [],
+      "value_type": "text_list"
+    },
+    "method_family": {
+      "rq": "RQ1",
+      "description": "Classify mapping methods investigated by this study, not background mentions. Multi-label hybrids allowed. Expert-driven: substantive expert specification/judgment; statistical: psychometric, Bayesian, likelihood, regularization or factorization estimation/testing; machine learning: learned predictive/neural/tree/clustering mapping methods; LLM-based: large language model generates/validates/refines mapping. Explain borderline classifications in value.",
+      "codes": [
+        "expert-driven",
+        "statistical",
+        "machine learning",
+        "LLM-based",
+        "other"
+      ],
+      "value_type": "enum_list"
+    },
+    "domain": {
+      "rq": "RQ1",
+      "description": "Empirical application setting: educational measurement (assessment/test diagnosis), ITS/learning analytics (tutoring/logs/KC models), psychological/clinical assessment (symptoms/personality/noncognitive attributes). Multi-label allowed. Pure simulations without an explicit domain use domain_unspecified_simulation; do not assume educational measurement from DINA alone.",
+      "codes": [
+        "educational measurement",
+        "intelligent tutoring systems and learning analytics",
+        "psychological and clinical assessment",
+        "domain_unspecified_simulation",
+        "other"
+      ],
+      "value_type": "enum_list"
+    },
+    "q_matrix_task": {
+      "rq": "RQ1",
+      "description": "Task applied to the item-attribute mapping itself: initial generation, validation, or refinement. Mere use of a fixed mapping is not a task contribution. Multi-label allowed.",
+      "codes": [
+        "generation",
+        "validation",
+        "refinement"
+      ],
+      "value_type": "enum_list"
+    },
+    "data_type": {
+      "rq": "RQ2",
+      "description": "Data actually used by this study: simulated and/or empirical. Code both when both occur. A theoretical/no-data paper uses neither.",
+      "codes": [
+        "simulated",
+        "empirical",
+        "neither"
+      ],
+      "value_type": "enum_list"
+    },
+    "sample_size": {
+      "rq": "RQ2",
+      "description": "Sample sizes per named empirical dataset and simulation condition; distinguish participants from interactions and simulation replications. Preserve ranges/conditions and units.",
+      "codes": [],
+      "value_type": "integer_conditions"
+    },
+    "number_of_items": {
+      "rq": "RQ2",
+      "description": "Number of assessment items per dataset/experiment or simulation condition; identify conditions rather than conflating them.",
+      "codes": [],
+      "value_type": "integer_conditions"
+    },
+    "number_of_attributes": {
+      "rq": "RQ2",
+      "description": "Number of diagnostic attributes/skills per named dataset or simulation condition.",
+      "codes": [],
+      "value_type": "integer_conditions"
+    },
+    "response_type": {
+      "rq": "RQ2",
+      "description": "Observed item-response categories: dichotomous versus polytomous. Distinguish polytomous latent attributes from polytomous item responses. Mention response times separately, not as polytomous responses.",
+      "codes": [
+        "dichotomous",
+        "polytomous",
+        "other"
+      ],
+      "value_type": "enum_list"
+    },
+    "attribute_structure": {
+      "rq": "RQ2",
+      "description": "Independent/nonhierarchical, hierarchical/prerequisite, correlated or mixed attribute structures, with details. Attribute correlations are not automatically prerequisite hierarchies.",
+      "codes": [
+        "independent",
+        "hierarchical",
+        "correlated",
+        "mixed",
+        "other"
+      ],
+      "value_type": "enum_list"
+    },
+    "diagnostic_model": {
+      "rq": "RQ2",
+      "description": "Names of diagnostic models used in this study and relation to conditions, e.g. DINA, G-DINA, DINO, LCDM. Not models mentioned only in background.",
+      "codes": [],
+      "value_type": "text_list"
+    },
+    "simulation_misspecification_proportion": {
+      "rq": "RQ2",
+      "description": "In simulations, fraction/percentage of Q-matrix entries initially misspecified and how errors were introduced; distinguish entry error rate from fraction of items altered. not_applicable only if the study has no simulations. If simulations exist but this is unspecified, not_reported. Normalize numeric proportions to 0–1 and use unit proportion; keep the original percentage in the narrative.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "simulation_item_quality": {
+      "rq": "RQ2",
+      "description": "In simulations, item-quality conditions, e.g. slipping/guessing/discrimination parameters and levels. not_applicable only if there are no simulations; otherwise not_reported if missing.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "benchmark_datasets": {
+      "rq": "RQ3",
+      "description": "Names/sources of benchmark datasets actually used to evaluate the mapping method, linking metrics to datasets. Explicitly unnamed empirical data are not named benchmarks.",
+      "codes": [],
+      "value_type": "text_list"
+    },
+    "q_matrix_recovery": {
+      "rq": "RQ3",
+      "description": "Mapping recovery criterion, operational definition, results and condition: entrywise accuracy, exact Q-matrix recovery, item-vector recovery etc. Not latent-attribute classification accuracy.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "attribute_classification_accuracy": {
+      "rq": "RQ3",
+      "description": "Attribute-profile or attribute-wise classification accuracy, metric, results and conditions; distinguish from mapping recovery.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "classification_reliability": {
+      "rq": "RQ3",
+      "description": "Reliability/consistency of diagnostic classifications; distinguish from classification accuracy and generic test reliability.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "power": {
+      "rq": "RQ3",
+      "description": "Power/sensitivity of Q-matrix validation tests, with test, criterion, numerical findings and conditions. Generic predictive accuracy is not power.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "type_i_error": {
+      "rq": "RQ3",
+      "description": "Type I error/false-positive rate of Q-matrix validation tests, with test, nominal alpha, results and conditions. Not generic misclassification error.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "model_fit": {
+      "rq": "RQ3",
+      "description": "Fit criteria used to assess the mapping method (likelihood, AIC/BIC, RMSEA, residuals etc), results and conditions. Distinguish evaluation of a fixed CDM from evaluation of mapping changes.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "held_out_prediction": {
+      "rq": "RQ3",
+      "description": "Prediction of held-out responses: split/CV protocol, metrics and results. Training fit alone is not held-out prediction.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "expert_matrix_agreement": {
+      "rq": "RQ3",
+      "description": "Agreement with expert-specified mappings: reference construction, agreement metric, results. A simulation true matrix is not an expert reference.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "expert_review": {
+      "rq": "RQ3",
+      "description": "Expert judgment/review used to evaluate the mapping and its findings, distinct from expert generation.",
+      "codes": [
+        "expert_review"
+      ],
+      "value_type": "enum_list"
+    },
+    "think_aloud_review": {
+      "rq": "RQ3",
+      "description": "Think-aloud/cognitive interview evidence used to evaluate item-skill mappings and findings.",
+      "codes": [
+        "think_aloud_review"
+      ],
+      "value_type": "enum_list"
+    },
+    "computational_cost": {
+      "rq": "RQ3",
+      "description": "Reported runtime, memory, hardware, complexity or resource requirements, with conditions. Algorithm iterations alone are not elapsed time.",
+      "codes": [],
+      "value_type": "numeric_conditions"
+    },
+    "author_reported_limitations": {
+      "rq": "RQ4",
+      "description": "Limitations explicitly acknowledged by authors of THIS mapping study; preserve each limitation and its method/condition, with short evidence. Do not invent weaknesses or borrow cited studies’ limitations.",
+      "codes": [],
+      "value_type": "text_list"
+    },
+    "limitation_themes": {
+      "rq": "RQ4",
+      "description": "Provisional multi-label themes grounded only in author_reported_limitations. Retain emergent themes as other with explanation; not an exhaustive final codebook. Never add a theme without an author statement.",
+      "codes": [
+        "sample_size",
+        "generalizability",
+        "data_quality_or_availability",
+        "model_assumptions",
+        "identifiability",
+        "computational_cost",
+        "expert_subjectivity",
+        "interpretability",
+        "validation_or_benchmark_limits",
+        "mapping_or_attribute_complexity",
+        "LLM_reliability",
+        "other"
+      ],
+      "value_type": "enum_list"
+    }
+  }
+}

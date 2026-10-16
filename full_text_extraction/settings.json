@@ -1,21 +1,8 @@
 {
   "model": "gpt-6-luna",
   "reasoning_effort": "low",
-  "max_output_tokens": 6000,
+  "max_output_tokens": 14000,
   "max_input_characters": 500000,
   "timeout_seconds": 180,
-  "fields": {
-    "title": "Title of this paper.",
-    "publication_year": "Publication year of this paper.",
-    "q_matrix_contribution": "Does this paper generate, validate, refine, or only use an existing Q-matrix or equivalent item-skill/knowledge-component mapping? Explain briefly. This is not a final eligibility decision.",
-    "method_family": "One or more of expert-driven, statistical, machine learning, LLM-based; name the actual method. Extract this paper's own contribution, not background citations.",
-    "domain": "Educational measurement, intelligent tutoring systems and learning analytics, or psychological and clinical assessment; describe the setting.",
-    "data_type": "Simulated, empirical, both, or neither; identify datasets if reported.",
-    "sample_size": "Sample sizes, distinguishing empirical samples from simulation conditions and replications.",
-    "items_and_attributes": "Numbers of assessment items and diagnostic attributes or skills; distinguish conditions.",
-    "response_type": "Dichotomous or polytomous responses and any other reported response formats.",
-    "diagnostic_model": "Diagnostic model names used in this study.",
-    "evaluation_and_benchmarks": "Evaluation criteria for the mapping method and benchmark datasets. Distinguish Q-matrix recovery from attribute classification and prediction accuracy.",
-    "author_reported_limitations": "Limitations stated by the authors, not limitations inferred by the extractor."
-  }
+  "taxonomy_file": "taxonomy.json"
 }
