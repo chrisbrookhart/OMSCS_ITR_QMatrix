@@ -1,3 +1,5 @@
+> Historical v1 pilot taxonomy. The current paper/experiment schemas and controlled vocabularies are documented in [SLR extraction](full_text_extraction.md). This file remains for interpreting saved flat pilot results.
+
 # Initial Q-matrix extraction taxonomy and screening plan
 
 This codebook implements sections 1, 2.3 and 2.4 of the local `input/qmatrix_checkin_2.pdf`. Version 0.2.0 is in `full_text_extraction/taxonomy.json`. It supersedes the smaller starter field list. The document retains an October 8, 2026 eligibility cutoff even though searches ran October 9; the taxonomy does not silently change that protocol detail.

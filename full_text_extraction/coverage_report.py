@@ -15,7 +15,7 @@ def write_coverage(run, fields=None):
     selected = manifest['selected_pdfs']
     success = [p for p in manifest['papers'] if p['status'] == 'extracted']
     # Recheck saved extractions locally; never change model values or statuses.
-    from extract import evidence_warnings
+    from legacy_review import evidence_warnings
     for paper in success:
         for stale in ('error', 'http_status', 'api_error_code'):
             paper.pop(stale, None)
@@ -26,11 +26,11 @@ def write_coverage(run, fields=None):
             (folder / 'extraction.json').write_text(json.dumps(extraction, ensure_ascii=False, indent=2) + '\n')
             paper['review_warnings'] = extraction['review_warnings']
     manifest['coverage_script_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
-    manifest['validation_script_sha256'] = hashlib.sha256((Path(__file__).parent / 'extract.py').read_bytes()).hexdigest()
+    manifest['validation_script_sha256'] = hashlib.sha256((Path(__file__).parent / 'legacy_review.py').read_bytes()).hexdigest()
     (run / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
     from export_typed import export_typed
     export_typed(run, fields, success)
-    from extract import append_review_rows
+    from legacy_review import append_review_rows
     review_rows = []
     for paper in success:
         extraction = json.loads((run / paper['directory'] / 'extraction.json').read_text())

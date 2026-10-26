@@ -4,5 +4,5 @@
   "max_output_tokens": 14000,
   "max_input_characters": 500000,
   "timeout_seconds": 180,
-  "taxonomy_file": "taxonomy.json"
+  "max_retries": 2
 }
