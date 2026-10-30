@@ -6,6 +6,7 @@ from io import StringIO
 import json
 from pathlib import Path
 import tempfile
+from threading import Barrier, Lock, get_ident
 import unittest
 from unittest.mock import Mock, patch
 from openpyxl import load_workbook
@@ -102,8 +103,17 @@ def settings() -> storage.Settings:
 
 
 def response(payload: dict[str, object] | None = None, status: str = 'completed') -> Mock:
-    text = json.dumps(payload or paper_payload())
-    result = Mock(status=status, output_text=text)
+    data = dict(payload or paper_payload())
+    count = len(data.get('experiments', []))
+    data['experiment_design'] = {'primary_experiment_number': 1 if count else None,
+        'assignments': [{'experiment_number': index + 1, 'role': 'main' if index == 0 else 'supporting',
+                         'rationale': field('Central study' if index == 0 else 'Auxiliary check')}
+                        for index in range(count)]}
+    data['missing_fields'] = []
+    for name in ('title', 'doi', 'publication_year'):
+        data.pop(name, None)
+    text = json.dumps(data)
+    result = Mock(status=status, output_text=text, incomplete_details=None)
     result.model_dump.return_value = {'id': 'synthetic-response', 'model': 'gpt-6-luna', 'status': status,
         'usage': {'total_tokens': 10},
         'output': [{'type': 'message', 'content': [{'type': 'output_text', 'text': text}]}]}
@@ -251,14 +261,15 @@ class WorkbookTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'review.xlsx'
             result = record()
-            result.paper.title.value = '=1+1'
+            result.bibliography = models.BibliographicMetadata(citation_key='synthetic',
+                fields={'title': '=1+1'}, source='synthetic.bib', source_sha256='synthetic')
             result.paper.experiments[0].description.value = 'x' * 40000
             result.paper.experiments[0].conditions.item_quality.value = 'a\x01b'
             spreadsheet.export_workbook([result], path)
             workbook = load_workbook(path)
             self.assertTrue(workbook['Overflow'].max_row > 1)
-            self.assertEqual(workbook['Flat']['D2'].data_type, 's')
-            self.assertEqual(workbook['Flat']['D2'].value, '=1+1')
+            self.assertEqual(workbook['Flat']['F2'].data_type, 's')
+            self.assertEqual(workbook['Flat']['F2'].value, '=1+1')
             workbook.close()
 
 
@@ -276,11 +287,14 @@ class PipelineTests(unittest.TestCase):
         self.client.responses.create.return_value = response()
 
     def run_pipeline(self, execute: bool = True, resume: Path | None = None,
-                     source_map: Path | None = None, retry_failed: bool = False, model: str | None = None) -> int:
+                     source_map: Path | None = None, retry_failed: bool = False,
+                     model: str | None = None, workers: int = 1,
+                     bibliography_paths: list[Path] | None = None) -> int:
         with patch('pdf_text.read_pdf', return_value=[SYNTHETIC_TEXT]), patch('api.create_client', return_value=self.client):
             return pipeline.main(input_directory=self.inputs, settings_path=self.settings_path,
                 limit=10, execute=execute, resume=resume, output_directory=self.root / 'output',
-                source_map=source_map, retry_failed=retry_failed, model=model)
+                source_map=source_map, retry_failed=retry_failed, model=model, workers=workers,
+                bibliography_paths=bibliography_paths)
 
     def runs(self) -> list[Path]:
         return sorted(path.parent for path in (self.root / 'output').glob('*/manifest.json'))
@@ -422,12 +436,13 @@ class PipelineTests(unittest.TestCase):
         record = models.PaperRecord.model_validate_json(next(run.glob('*/extraction.json')).read_text())
         expected = citation_keys.from_paper(record.paper, 'synthetic.pdf', record.provenance.source_sha256)
         self.assertEqual(record.paper_id, expected)
-        self.assertTrue(expected.startswith('SyntheticStudynd_'))
+        self.assertTrue(expected.startswith('Syntheticnd_'))
         self.assertEqual(record.experiment_ids, [f'{expected}:E001'])
         manifest = pipeline.Manifest.model_validate_json((run / storage.MANIFEST_FILE).read_text())
         self.assertEqual(manifest.papers[0].paper_id, expected)
         workbook = load_workbook(run / storage.WORKBOOK_FILE)
-        self.assertEqual(workbook['Flat']['A2'].value, expected)
+        self.assertEqual(workbook['Flat']['A2'].value, 1)
+        self.assertEqual(workbook['Flat']['O2'].value, expected)
         workbook.close()
 
     def test_old_hash_ids_upgrade_locally_without_repeating_paid_request(self) -> None:
@@ -448,7 +463,7 @@ class PipelineTests(unittest.TestCase):
         manifest_path.write_text(json.dumps(manifest))
         self.assertEqual(self.run_pipeline(resume=run), 0)
         upgraded = json.loads(path.read_text())
-        self.assertTrue(upgraded['paper_id'].startswith('SyntheticStudynd_'))
+        self.assertTrue(upgraded['paper_id'].startswith('Syntheticnd_'))
         self.assertEqual(upgraded['provenance'], original_provenance)
         self.assertEqual(self.client.responses.create.call_count, 1)
 
@@ -484,6 +499,81 @@ class PipelineTests(unittest.TestCase):
             api.create_client(settings())
         self.assertEqual(constructor.call_args.kwargs['max_retries'], 2)
         self.assertEqual(constructor.call_args.kwargs['api_key'], 'synthetic-key')
+
+    def test_bibtex_metadata_updates_locally_without_repeating_paid_extraction(self) -> None:
+        path = self.root / 'synthetic.bib'
+        path.write_text('@article{synthetic, title={BibTeX title}, abstract={First abstract}, year={2024}}')
+        self.assertEqual(self.run_pipeline(bibliography_paths=[path]), 0)
+        run = self.runs()[0]
+        saved = models.PaperRecord.model_validate_json(next(run.glob('*/extraction.json')).read_text())
+        self.assertEqual(saved.paper_id, 'synthetic')
+        self.assertIsNone(saved.paper.title.value)
+        self.assertEqual(saved.bibliography.fields['title'], 'BibTeX title')
+        schema = self.client.responses.create.call_args.kwargs['text']['format']['schema']
+        self.assertNotIn('title', schema['properties'])
+        path.write_text(path.read_text().replace('First abstract', 'Updated abstract'))
+        self.assertEqual(self.run_pipeline(resume=run), 0)
+        updated = models.PaperRecord.model_validate_json(next(run.glob('*/extraction.json')).read_text())
+        self.assertEqual(updated.bibliography.fields['abstract'], 'Updated abstract')
+        self.assertEqual(self.client.responses.create.call_count, 1)
+
+    def test_drive_links_are_added_by_exporter_without_new_api_requests(self) -> None:
+        self.assertEqual(self.run_pipeline(), 0)
+        mapping = self.root / 'drive-links.json'
+        target = 'https://drive.google.com/file/d/synthetic/view'
+        mapping.write_text(json.dumps({'synthetic.pdf': target}))
+        with patch('drive_links.DEFAULT_LINKS_PATH', mapping):
+            export_workbook.main(run=self.runs()[0])
+        workbook = load_workbook(self.runs()[0] / storage.WORKBOOK_FILE)
+        self.assertEqual(workbook['Review']['D4'].value, 'synthetic.pdf')
+        self.assertEqual(workbook['Review']['D4'].hyperlink.target, target)
+        self.assertEqual(workbook['Review'].freeze_panes, 'D4')
+        workbook.close()
+        self.assertEqual(self.client.responses.create.call_count, 1)
+
+    def test_concurrent_failures_checkpoint_on_coordinator_and_resume_from_cache(self) -> None:
+        for name in ('second', 'third'):
+            (self.inputs / f'{name}.pdf').write_bytes(name.encode())
+        barrier, lock = Barrier(2, timeout=5), Lock()
+        calls: list[int] = []
+        coordinator = get_ident()
+        checkpoint_threads: list[int] = []
+        original_checkpoint = pipeline.checkpoint
+
+        def request(**kwargs: object) -> Mock:
+            with lock:
+                calls.append(get_ident())
+                number = len(calls)
+            if number <= 2:
+                barrier.wait()
+            if number == 3:
+                raise RuntimeError('Synthetic request failure')
+            return response()
+
+        def checkpoint(*args: object) -> None:
+            checkpoint_threads.append(get_ident())
+            original_checkpoint(*args)
+
+        self.client.responses.create.side_effect = request
+        with patch('pipeline.checkpoint', side_effect=checkpoint):
+            self.assertEqual(self.run_pipeline(workers=2), 1)
+        self.assertEqual(len(set(calls[:2])), 2)
+        self.assertEqual(set(checkpoint_threads), {coordinator})
+        manifest_path = self.runs()[0] / storage.MANIFEST_FILE
+        manifest = pipeline.Manifest.model_validate_json(manifest_path.read_text())
+        self.assertEqual(sum(job.status == pipeline.RunStatus.EXTRACTED for job in manifest.papers), 2)
+        self.assertEqual(self.run_pipeline(resume=self.runs()[0], workers=1), 0)
+        self.assertEqual(len(calls), 4)
+
+    def test_interrupt_drains_active_requests_and_resume_reuses_saved_results(self) -> None:
+        (self.inputs / 'second.pdf').write_bytes(b'second synthetic PDF')
+        with patch('pipeline.wait', side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_pipeline(workers=2)
+        cache = self.root / 'output' / storage.CACHE_DIRECTORY
+        self.assertEqual(len(list(cache.glob('*/extraction.json'))), 2)
+        self.assertEqual(self.run_pipeline(resume=self.runs()[0], workers=2), 0)
+        self.assertEqual(self.client.responses.create.call_count, 2)
 
 
 if __name__ == '__main__':

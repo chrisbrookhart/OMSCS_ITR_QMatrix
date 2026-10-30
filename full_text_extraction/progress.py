@@ -20,9 +20,10 @@ def report_wait(finished: Event, model: str, started: float) -> None:
 
 
 @contextmanager
-def waiting_for_response(model: str) -> Iterator[None]:
+def waiting_for_response(model: str, source: str | None = None) -> Iterator[None]:
     finished = Event()
-    worker = Thread(target=report_wait, args=(finished, model, monotonic()), daemon=True)
+    label = f'{model} ({source})' if source else model
+    worker = Thread(target=report_wait, args=(finished, label, monotonic()), daemon=True)
     worker.start()
     try:
         yield

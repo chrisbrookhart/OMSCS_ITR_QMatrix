@@ -24,7 +24,7 @@ SCHEMA_FILE = 'schema.json'
 PROMPT_FILE = 'instructions.txt'
 CACHE_DIRECTORY = 'cache_v2'
 SPARSE_PAGE_CHARACTERS = 100
-SUPPORTED_MODELS = ('gpt-6-luna', 'gpt-6.1-sol')
+SUPPORTED_MODELS = ('gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol')
 
 
 class Settings(BaseModel):

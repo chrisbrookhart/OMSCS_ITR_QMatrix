@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from typing import Generic, TypeVar
-from pydantic import BaseModel, ConfigDict
+from enum import Enum
+from pydantic import BaseModel, ConfigDict, Field
 import vocabulary as vocab
 
 Value = TypeVar('Value')
-SCHEMA_VERSION = '2.0'
-PROMPT_VERSION = '2.0'
+SCHEMA_VERSION = '2.3'
+PROMPT_VERSION = '2.3'
 PAGE_NUMBERING = 'physical_pdf_1_based'
 
 
@@ -94,6 +95,59 @@ class Paper(StrictModel):
     experiments: list[Experiment]
 
 
+class ExperimentRole(str, Enum):
+    MAIN = 'main'
+    SUPPORTING = 'supporting'
+    UNCLEAR = 'unclear'
+
+
+class ExperimentAssignment(StrictModel):
+    experiment_number: int = Field(ge=1)
+    role: ExperimentRole
+    rationale: Extraction[str]
+
+
+class ExperimentDesign(StrictModel):
+    primary_experiment_number: int | None
+    assignments: list[ExperimentAssignment]
+
+
+class MissingReason(str, Enum):
+    NOT_REPORTED = 'not_reported'
+    NOT_APPLICABLE = 'not_applicable'
+    OUTSIDE_TAXONOMY = 'outside_taxonomy'
+    AMBIGUOUS_REPORTING = 'ambiguous_reporting'
+    POSSIBLY_VISUAL = 'possibly_in_table_or_figure'
+    POSSIBLE_TEXT_ISSUE = 'possible_text_extraction_issue'
+    UNKNOWN = 'unknown'
+
+
+class MissingFieldAssessment(StrictModel):
+    field_path: str
+    potential_reason: MissingReason
+    explanation: str
+    evidence: list[Evidence]
+
+
+class ExtractionPaper(StrictModel):
+    """New requests classify designs; historical Paper records remain readable."""
+    method: Method
+    domain: Extraction[vocab.Domain]
+    limitations: list[Limitation]
+    experiments: list[Experiment]
+    experiment_design: ExperimentDesign
+    missing_fields: list[MissingFieldAssessment]
+
+
+class BibliographicMetadata(StrictModel):
+    citation_key: str
+    fields: dict[str, str]
+    source: str
+    source_sha256: str
+    match_basis: str = 'unmatched'
+    alternative_keys: list[str] = Field(default_factory=list)
+
+
 class ReviewIssue(StrictModel):
     field: str
     reason: str
@@ -111,9 +165,23 @@ class Provenance(StrictModel):
     response_id: str
 
 
+class ResponseRecovery(StrictModel):
+    recovered_at: str
+    run_request_fingerprint: str
+    source_response_path: str
+    source_response_sha256: str
+    source_response_status: str
+    actions: list[str]
+    unresolved_fields: list[str]
+
+
 class PaperRecord(StrictModel):
     paper_id: str
     experiment_ids: list[str]
     provenance: Provenance
     paper: Paper
     review_issues: list[ReviewIssue]
+    experiment_design: ExperimentDesign | None = None
+    missing_fields: list[MissingFieldAssessment] = Field(default_factory=list)
+    bibliography: BibliographicMetadata | None = None
+    recovery: ResponseRecovery | None = None

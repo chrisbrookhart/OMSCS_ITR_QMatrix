@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from pydantic import BaseModel
 import models
+import bibliography
 import storage
 import validation
 import vocabulary as vocab
@@ -28,6 +29,8 @@ def field_coverage(records: list[models.PaperRecord]) -> list[FieldCoverage]:
     for record in records:
         flagged = {issue.field for issue in record.review_issues}
         for path, field in validation.fields_in(record.paper):
+            if path in bibliography.METADATA_PATHS:
+                continue
             # Array indexes are grouped; counts describe field observations, not papers.
             name = re.sub(r'\[\d+\]', '[]', path)
             count = counts.setdefault(name, Counter())

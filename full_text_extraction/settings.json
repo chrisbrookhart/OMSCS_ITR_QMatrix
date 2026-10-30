@@ -1,8 +1,8 @@
 {
   "model": "gpt-6-luna",
-  "reasoning_effort": "low",
-  "max_output_tokens": 14000,
+  "reasoning_effort": "max",
+  "max_output_tokens": 80000,
   "max_input_characters": 500000,
-  "timeout_seconds": 180,
+  "timeout_seconds": 1200,
   "max_retries": 2
 }

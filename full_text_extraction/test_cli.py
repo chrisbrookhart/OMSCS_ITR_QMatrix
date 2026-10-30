@@ -32,6 +32,13 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(main.call_args.kwargs['model'], 'gpt-6.1-sol')
         self.assertTrue(main.call_args.kwargs['execute'])
 
+    def test_large_concurrency_forwards_the_explicit_token_rate_limit(self) -> None:
+        arguments = ['extract', '--workers', '110', '--tokens-per-minute', '2000000']
+        with patch('sys.argv', arguments), patch('pipeline.main', return_value=0) as main:
+            self.assertEqual(extract.main(), 0)
+        self.assertEqual(main.call_args.kwargs['workers'], 110)
+        self.assertEqual(main.call_args.kwargs['tokens_per_minute'], 2000000)
+
     def test_progress_flushes_stdout(self) -> None:
         with patch('builtins.print') as output:
             progress.log('Preparing PDF')

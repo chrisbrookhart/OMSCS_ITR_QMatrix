@@ -16,6 +16,9 @@ character limit, output-token limit, timeout and bounded SDK retries in
 `full_text_extraction/settings.json`. Credentials still come exclusively from the
 ignored `full_text_extraction/config.py`, using `config.py.template` on a fresh
 checkout. Cached-only and preparation runs need no credentials.
+The current extraction defaults are Luna with max reasoning, an 80,000-token
+output ceiling and a 1,200-second request timeout. An allowance is a ceiling;
+actual token usage can be lower. Saved settings preserve earlier run parameters.
 
 Progress is printed immediately to stdout, including the selected model, output
 folder, `[current/total]` paper, preparation, cache reuse, API submission, validation,
@@ -31,7 +34,7 @@ uv run full_text_extraction/extract.py --execute --model gpt-6.1-sol
 uv run full_text_extraction/extract.py --execute --model gpt-6-luna --limit 21
 ```
 
-`--model` accepts only `gpt-6.1-sol` and `gpt-6-luna`, the documented
+`--model` accepts `gpt-6-sol`, `gpt-6.1-sol` and `gpt-6-luna`, the documented
 [Sol](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and
 [Luna](https://developers.openai.com/api/docs/models/gpt-6-luna) API names.
 Omitting it preserves the model in `--settings`. An override is saved in the run's
@@ -39,6 +42,65 @@ settings and cache identity without changing the source settings file. Resuming
 an overridden run requires the same override (or equivalent settings). The default
 output root is `check-in-2/output/full_text_extraction/`, with a timestamped run
 folder and a shared `cache_v2/` beneath that root; `--output` changes the root.
+
+Use `--workers 4` to process up to four papers concurrently. The default is one;
+the supported range is 1–128. More than 16 workers requires `--tokens-per-minute`
+with the observed account limit. For example, `--workers 110
+--tokens-per-minute 2000000` permits all selected papers to be in flight, while
+pacing request starts at 80% of that limit. At an 80,000-token reservation this is
+about one request every three seconds. Longer estimated inputs are paced more
+slowly. The input estimate uses total PDF/prompt/schema characters divided by
+three; server token accounting remains authoritative and SDK retries still apply.
+This spreads admissions over minutes rather than submitting one large burst.
+Each worker owns a separate paper cache folder, while
+one coordinator writes the manifest, workbook and coverage reports. PDF text
+preparation is serialized because its warning logger is process-wide. Requests
+and validation can proceed concurrently. Heartbeats identify their source paper.
+Account request/token limits still apply; SDK retries handle transient rate limits.
+Changing worker count does not change the request fingerprint or invalidate caches.
+Do not start a second process writing the same run or cache.
+
+To change concurrency, interrupt the coordinator once, allow active request
+threads to finish and save their cache records, and wait for the process to exit
+before resuming with the new worker count. A second interrupt can abandon active
+responses. Saved request fingerprints exclude scheduling options, so completed
+cache records remain reusable when worker count or pacing changes. Resume also
+restores a previously saved token-rate limit unless explicitly overridden.
+
+Set `reasoning_effort` and `max_output_tokens` in a settings JSON file, then pass
+it with `--settings`. The token allowance covers reasoning and returned JSON
+together. High reasoning effort may consume a small allowance before producing
+any visible output. A larger allowance is a ceiling, not a requirement to spend
+every token. Inspect saved `response.json` usage and `incomplete_details` before
+changing limits or reissuing requests. Configuration changes create separate cache
+identities, so token-budget comparisons intentionally make new paid requests.
+
+## Token-budget pilot
+
+Test a small local sample before changing all papers. Include a long-output paper,
+a paper with many review issues, and a PDF that previously caused preparation
+problems. Keep the same revised prompt, schema, input files and reasoning effort
+across the compared output limits. Use separate settings files and run folders.
+Compare completed records, truncation, reasoning/visible tokens, field coverage
+and quotation issues. Missing counts and review flags do not prove factual accuracy;
+human inspection of evidence and experiment boundaries remains necessary.
+
+The local reporter reads saved runs without API calls:
+
+```bash
+full_text_extraction/.venv/bin/python full_text_extraction/token_budget_report.py \
+  --runs output/full_text_extraction/<pilot-run-1> output/full_text_extraction/<pilot-run-2> \
+  --output output/luna_max_token_test
+```
+
+It writes local CSV/JSON comparisons and recommends the smallest tested max-effort
+limit that completes every sample with at least 20% unused allowance. If no tested
+limit has that reserve, it separately identifies the smallest successful tested
+limit and suggests a larger ceiling from observed usage, rounded up to 10,000
+tokens. That derived ceiling is not itself a tested result. This is a sample-based
+budget recommendation, not a universal optimum or accuracy score.
+Historical low-effort results used an older prompt, so they are a contextual
+baseline rather than a controlled comparison of reasoning effort alone.
 
 ## Inspect the implementation
 
@@ -71,6 +133,31 @@ and the schema uses the supported object/array/enum/anyOf types. Tests check tha
 the generated schema is already equivalent to the SDK strict-schema conversion.
 
 ## Paper IDs and source associations
+
+Pass `--bibliography input/library.bib` (or several files after that option) to
+load paper metadata locally with BibTeX parsing, string expansion and LaTeX-to-
+Unicode conversion. Citations, abstracts, title, authors, year, venue, DOI and URL
+come exclusively from these entries. They have ordinary single workbook columns,
+not evidence/secondary-value triplets. The complete parsed entry and bibliography
+path/hash remain in `Papers`; `Bibliography Matches` records the matching basis and
+alternative duplicate keys. Unmatched entries remain blank, without LLM fallback.
+
+Associations use explicit source-map keys, source filenames/attachment paths,
+DOIs on the first PDF page, then exact normalized titles in the first two pages.
+Different DOIs or otherwise ambiguous works are rejected. Duplicate entries for
+the same work prefer an exact title match, an available abstract, then metadata
+completeness with a deterministic citation-key tie break. Values come from the
+selected entry rather than being merged or generated. The supplied bibliography
+is not modified. Changing bibliography metadata alone does not require new API
+requests; a cached record can be associated and relabeled locally.
+
+To revise only the workbook and preserve the existing version:
+
+```bash
+full_text_extraction/.venv/bin/python full_text_extraction/export_workbook.py \
+  output/full_text_extraction/<run> --bibliography input/library.bib \
+  --output output/full_text_extraction/<run>/extraction_revised.xlsx
+```
 
 Supply existing bibliography/RIS IDs verbatim with `--source-map input/paper_sources.json`.
 The JSON file is an array, for example:
@@ -106,8 +193,10 @@ spreadsheet identifiers use the same citation key.
 
 ## Records and evidence
 
-Each paper contains wrapped title, DOI, publication year, investigated method,
-domain, paper limitations, and an experiment array (possibly empty). Experiments
+Current requests extract investigated method, domain, paper limitations, and an
+experiment array (possibly empty). BibTeX metadata is stored separately. Legacy
+canonical title/DOI/year wrappers remain readable for compatibility; new requests
+leave those slots empty and never use them to populate workbook metadata. Experiments
 contain their description, method/domain overrides, conditions, evaluation entries
 and experiment limitations. The pipeline supplies IDs; they are identifiers rather
 than claims extracted from the paper. Each extracted field has `value`, `other`,
@@ -141,6 +230,9 @@ Values are preserved for human correction, never silently dropped. PDF text
 extraction can scramble tables and columns; table locations must identify the
 table and row/column context, and reviewers should check the PDF. OCR is not
 included. Empty PDFs and documents over the character limit fail without a request.
+Malformed Unicode surrogate pairs from PDF text extraction are combined when
+valid; isolated surrogate characters become Unicode replacement characters.
+Affected physical page numbers are logged in `pdf_warnings.log` for review.
 
 ## Outputs, caching and interrupted runs
 
@@ -179,14 +271,107 @@ cache entries. The historical `taxonomy.json`, `export_typed.py`,
 `coverage_report.py` and `legacy_review.py` only support inspecting/regenerating old
 flat exports. They are not used by the new extraction path.
 
+## Audited recovery of saved responses
+
+`recover_response.py` performs only an explicitly selected local repair. It never
+submits API requests, rewrites raw responses, or edits shared machine caches.
+Available modes are:
+
+- `deduplicate_roles`: remove exactly identical role assignments; reject conflicts.
+- `complete_roles`: retain missing roles as unclear with null rationale and no invented evidence.
+- `recover_notes`: preserve complete scientific fields, roles and complete missing-field
+  assessments before a truncated assessment; unavailable explanations stay unknown.
+- `recover_design`: preserve complete scientific fields while leaving unfinished
+  role/design information unclear, without inferring a main experiment.
+
+Recovery uses JSON decoding of complete top-level values and complete assessment
+array entries, followed by schema and role-coverage validation. A partially written
+experimental array cannot be declared complete. Inspect each case before selecting
+a mode. Local recovery does not establish factual accuracy or resolve review flags.
+
+```bash
+full_text_extraction/.venv/bin/python full_text_extraction/recover_response.py \
+  output/full_text_extraction/<run> --source synthetic.pdf --mode complete_roles
+```
+
+Each recovered run record carries a `recovery` audit: raw response path, hash and
+status, recovery timestamp, actions, unresolved fields, and the parent run's
+request fingerprint. Per-paper `recovery.json` and `recovered_payload.json` files
+retain local details. The original manifest is saved once under `recovery_original/`.
+The workbook's `Recovery` sheet displays the audit, and `Manual Review` retains
+unresolved issues. Missing value comments continue to use cautious unknown notes.
+
+An explicitly completed retry can be imported with `--retry-run <retry-run>` in
+place of `--mode`. Source hashes must match. The retry's actual request fingerprint
+and provenance remain intact even when its token allowance differs from the parent
+run. The original unsuccessful response remains preserved in the parent folder.
+Audited run records take precedence over shared caches on resume, preserving local
+repairs and retry imports. Changed parent request settings reject the recovery
+rather than silently treating it as a fresh model result. Rebuild the workbook with
+`export_workbook.py` after applying recoveries or imports.
+
 ## Workbook interpretation
 
-`Review` has category, variable and Value/Other/Raw Text header rows. Three header
-rows faithfully express the three requested levels. `Flat` uses unique
-`Category.Variable.Component` headers and identical data for filtering and analysis.
-Each has exactly one row per real experiment, sorted/grouped by paper; paper
-metadata repeats. Identifying columns and headers are frozen, filters are enabled,
-text wraps and alternating paper fills aid review. Only header cells are merged.
+`Review` has category, variable and Value/Other/Raw Text header rows. `Flat` uses
+unique `Category.Variable.Component` headers. Both start with paper index (1–n),
+experiment index (1–k within each paper), citation, PDF filename, and abstract. Papers sort by
+source path; experiments display the primary/reference row first, numbered one.
+Canonical experiment IDs are retained separately and do not change with display
+order. Each sheet has one row per real experiment. Columns 1–3 and headers are frozen, filters are
+enabled, and text wraps. Only header cells are merged.
+
+The Filename column (D) links to the existing Drive file using the local
+`input/pdf_drive_links.json` object, whose keys are PDF filenames and values are
+Drive URLs. Exact relative source-path keys take precedence over basename keys.
+Review, Flat and Paper Summary all receive the links. Missing mappings leave a
+plain filename. Columns 1–3 remain frozen; filename and abstract scroll. The loader
+never contacts Drive or changes file permissions, and the map stays untracked.
+
+Checkpoint exports and the standalone exporter use the map automatically when
+present. To use another map, pass `--pdf-drive-links input/custom_links.json` to
+`export_workbook.py`. Rebuilding a workbook changes no model requests or cache
+identity and does not incur API usage. Wait until an active pipeline writer exits
+before replacing its workbook, or export a snapshot to a separate output path.
+
+Paper colors alternate between blue and green, each with exactly two shades.
+Headers have a uniform fill. Experimental Other columns are narrow and empty
+secondary arrays display as blank cells. Each paper has a color block:
+its primary main experiment appears first in a darker shade;
+additional main or supporting experiments appear underneath in lighter shades.
+`Review` uses `(same)` for cells equal to the primary row, provided field statuses
+also match. Missing values are never converted to `(same)`. Evidence is compressed
+only when the evidence text itself matches. `Flat` always retains explicit values.
+
+`Paper Summary` provides one representative experiment per paper and includes
+papers without experiments. It does not combine incompatible conditions across
+experiments. The study-structure column identifies papers with multiple main
+experiments; consult their other rows before treating the summary as study-level
+coverage. `Experiment Roles` records the model's rationale, exact evidence and
+status for main/supporting/unclear classifications. Independent central studies
+remain main experiments, even when another is selected as the summary row.
+
+New requests use schema/prompt 2.3, adding experiment-design assignments and
+missing-field assessments while removing bibliographic metadata from the LLM
+response schema. Existing 2.0 canonical records remain exportable.
+They have no role classification: the first experiment is explicitly labeled as
+an unclassified reference, never silently called the main experiment. New prompts
+invalidate paid-request caches and require a new run instead of resuming a 2.0 run.
+
+`Missing Fields` lists missing primary values, their statuses, potential reasons,
+supporting evidence and review actions. Intentionally inherited method/domain
+overrides are excluded when a reported paper-level value supplies them. Reasons
+such as a possible table/figure or extraction issue are hypotheses, not imputed
+values or proven causes. Unsupported speculation, invalid field paths, duplicate
+assessments and unverified quotations are flagged for review. Without an assessment,
+the reason remains unknown. A useful review sequence is to check the cited PDF
+section, inspect tables/figures and supplements, then retain missing if unresolved.
+Blank experimental value cells also carry comments explaining their status and
+available reason. Fields can legitimately be unreported, structurally inapplicable,
+or outside the taxonomy. The prompt explicitly forbids nearest-category guesses,
+invented conditions, and using `other` simply to fill a cell. An outside-taxonomy
+note describes the mismatch without assigning an unsupported category. These gaps
+do not fail a paper's extraction. Any verification is optional; retain a blank
+when no value is justified. Explanations never replace canonical null values.
 
 Arrays and structured numeric settings use compact JSON. Evaluation and limitation
 Value cells are arrays, Other cells are aligned arrays of arrays, and Raw Text

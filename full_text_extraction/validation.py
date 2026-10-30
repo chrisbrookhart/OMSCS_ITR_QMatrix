@@ -5,6 +5,7 @@ import re
 from typing import Iterator
 from pydantic import BaseModel
 import models
+import bibliography
 import vocabulary as vocab
 
 COUNT_FIELDS = ('sample_size', 'number_of_items', 'number_of_attributes')
@@ -83,7 +84,42 @@ def field_issues(path: str, field: models.Extraction[object], pages: list[str]) 
     return issues
 
 
-def review_issues(paper: models.Paper, pages: list[str]) -> list[models.ReviewIssue]:
+def review_issues(paper: BaseModel, pages: list[str], prefix: str = '') -> list[models.ReviewIssue]:
     return [models.ReviewIssue(field=path, reason=reason)
-            for path, field in fields_in(paper)
+            for path, field in fields_in(paper, prefix)
             for reason in field_issues(path, field, pages)]
+
+
+def missing_assessment_issues(paper: models.Paper, assessments: list[models.MissingFieldAssessment],
+                               pages: list[str]) -> list[models.ReviewIssue]:
+    fields = dict(fields_in(paper))
+    issues = []
+    seen: set[str] = set()
+    for assessment in assessments:
+        target = fields.get(assessment.field_path)
+        reasons = []
+        if target is None or target.value is not None or assessment.field_path in bibliography.METADATA_PATHS:
+            reasons.append('Missing-field explanation does not target a missing primary value')
+        if assessment.field_path in seen:
+            reasons.append('Duplicate missing-field explanation')
+        seen.add(assessment.field_path)
+        evidence = models.Extraction[str](value=None, other=[], raw_text=assessment.evidence,
+                                         status=vocab.Status.NOT_REPORTED)
+        reasons.extend(quote_issues(evidence, pages))
+        if assessment.potential_reason in (models.MissingReason.POSSIBLY_VISUAL, models.MissingReason.POSSIBLE_TEXT_ISSUE) and not assessment.evidence:
+            reasons.append('Speculative missing-field explanation lacks supporting evidence')
+        issues.extend(models.ReviewIssue(field=assessment.field_path, reason=reason) for reason in reasons)
+    return issues
+
+
+def design_issues(design: models.ExperimentDesign, pages: list[str]) -> list[models.ReviewIssue]:
+    issues = review_issues(design, pages, 'experiment_design')
+    for index, assignment in enumerate(design.assignments):
+        if assignment.role == models.ExperimentRole.UNCLEAR:
+            reason = 'Experiment role is unclear; manual review required'
+        elif assignment.rationale.value is None or not assignment.rationale.raw_text:
+            reason = 'Experiment role lacks an evidence-backed rationale'
+        else:
+            continue
+        issues.append(models.ReviewIssue(field=f'experiment_design.assignments[{index}]', reason=reason))
+    return issues

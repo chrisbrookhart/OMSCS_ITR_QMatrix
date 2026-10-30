@@ -43,6 +43,10 @@ def get_parser() -> argparse.ArgumentParser:
                         help='Maximum PDFs to process in sorted path order (default: %(default)s).')
     parser.add_argument('--model', choices=storage.SUPPORTED_MODELS,
                         help='Override the model in --settings; otherwise use its model (bundled default: gpt-6-luna).')
+    parser.add_argument('--workers', type=positive, default=pipeline.DEFAULT_WORKERS,
+                        help='Maximum concurrent paper requests (default: %(default)s). Shared exports have one writer.')
+    parser.add_argument('--tokens-per-minute', type=positive,
+                        help='Observed account token limit; pace starts with 20%% reserve. Required above 16 workers.')
     parser.add_argument('--output', type=Path, default=storage.ROOT / 'output/full_text_extraction',
                         help='Root for timestamped run folders and the shared cache.\nDefault: %(default)s')
     add_execution_arguments(parser)
@@ -56,6 +60,8 @@ def add_execution_arguments(parser: argparse.ArgumentParser) -> None:
                         help='Existing run folder to continue; requires the same mode, selected PDFs, settings and model.')
     parser.add_argument('--source-map', type=Path,
                         help='Optional JSON array of {source, paper_id} entries preserving bibliography IDs.')
+    parser.add_argument('--bibliography', nargs='+', type=Path,
+                        help='BibTeX files supplying citations, abstracts and all paper metadata.')
     parser.add_argument('--retry-failed', action='store_true',
                         help='Archive and retry saved incomplete/refused/malformed responses; may incur new API usage.')
 
@@ -66,7 +72,8 @@ def main() -> int:
     try:
         return pipeline.main(input_directory=args.input.resolve(), settings_path=args.settings,
             limit=args.limit, execute=args.execute, resume=args.resume, output_directory=args.output,
-            source_map=args.source_map, retry_failed=args.retry_failed, model=args.model)
+            source_map=args.source_map, retry_failed=args.retry_failed, model=args.model, workers=args.workers,
+            bibliography_paths=args.bibliography, tokens_per_minute=args.tokens_per_minute)
     except ValueError as exc:
         parser.error(str(exc))
     return 1

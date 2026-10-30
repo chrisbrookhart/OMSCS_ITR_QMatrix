@@ -4,15 +4,28 @@ import logging
 from pypdf import PdfReader
 import storage
 
+PDF_LOGGER_NAME = 'pypdf'
+PDF_WARNINGS_FILE = 'pdf_warnings.log'
+
+
+def normalize_page_text(text: str, page_number: int) -> str:
+    """Combine surrogate pairs and replace invalid PDF character mappings."""
+    normalized = text.encode('utf-16', errors='surrogatepass').decode('utf-16', errors='replace')
+    if normalized != text:
+        logging.getLogger(PDF_LOGGER_NAME).warning(
+            'Normalized invalid Unicode surrogate text on physical PDF page %s.', page_number)
+    return normalized
+
 
 def read_pdf(path: Path, warnings_path: Path) -> list[str]:
-    logger = logging.getLogger('pypdf')
+    logger = logging.getLogger(PDF_LOGGER_NAME)
     handler = logging.FileHandler(warnings_path, encoding='utf-8')
     previous_propagate = logger.propagate
     logger.addHandler(handler)
     logger.propagate = False
     try:
-        return [page.extract_text() or '' for page in PdfReader(path).pages]
+        return [normalize_page_text(page.extract_text() or '', number)
+                for number, page in enumerate(PdfReader(path).pages, 1)]
     finally:
         logger.removeHandler(handler)
         logger.propagate = previous_propagate
@@ -20,7 +33,7 @@ def read_pdf(path: Path, warnings_path: Path) -> list[str]:
 
 
 def prepare(path: Path, folder: Path, maximum_characters: int) -> tuple[list[str], str]:
-    pages = read_pdf(path, folder / 'pdf_warnings.log')
+    pages = read_pdf(path, folder / PDF_WARNINGS_FILE)
     text = '\n\n'.join(f'[PDF PAGE {number}]\n{page}' for number, page in enumerate(pages, 1))
     storage.write_json(folder / storage.PAGES_FILE, pages)
     (folder / storage.TEXT_FILE).write_text(text, encoding='utf-8')
