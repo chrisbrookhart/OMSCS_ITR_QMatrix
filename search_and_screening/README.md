@@ -1,7 +1,7 @@
 # Search and screening code
 
-The code and prompts behind the paper's search (§3.2) and study selection (§3.3), linked from
-Appendix B. Data files are not included: database exports, candidate-record workbooks, the model's
+The code and prompts behind the paper's search (§3.2), study selection (§3.3) and table of
+included studies, linked from Appendix B. Data files are not included: database exports, candidate-record workbooks, the model's
 batch and result files, and full texts stay local for the licensing reasons given in the
 repository README.
 
@@ -26,6 +26,7 @@ screening scripts refer to it.
 | 1–2 (E6, E7) | `prescreen_metadata.py` | Applies the publication-type and date rules from bibliographic metadata and Crossref dates. |
 | 3 (E1–E5) | `step3_llm_screen.py` | Prepares randomised title-and-abstract batches for the model, assembles its decisions, and draws the blind validation sample. |
 | 3 | `step3_llm/screening_prompt.md` | The prompt given to the model. |
+| 3 pilot | `step3_llm/pilot/compare_pilot.py` | Compares the two pilot runs with known answers: the 24 test-set studies (all should be retained) and 25 records screened by hand. |
 | Retrieval | `fetch_oa_pdfs.py`, `collect_fulltext.py` | Finds and downloads open-access PDFs via OpenAlex, and collects all full texts by record ID with a title check. |
 | 4 (E1–E10) | `step4_llm_screen.py` | Extracts full text, prepares batches, assembles the model's full-text decisions, and lists candidate duplicate reports (E9). |
 | 4 | `step4_llm/fulltext_screening_prompt.md` | The prompt given to the model. |
@@ -35,6 +36,14 @@ screening scripts refer to it.
 The model (Claude Opus 5.5) ran outside these scripts, as Claude Code subagents. Each subagent saw
 only the prompt and one batch file. The scripts prepare the batches and check and assemble the
 results.
+
+## Included-studies table
+
+| File | What it does |
+|---|---|
+| `included_table/fetch_bib.py` | Fetches BibTeX for each included study's DOI from doi.org. |
+| `included_table/build.py` | Builds `included_studies.bib` and the paper's LaTeX table of the 110 included studies. |
+| `included_table/export_xlsx.py` | Exports that table to a workbook, with indicator columns for counting. |
 
 Requirements: Python 3.11, `openpyxl`, `xlrd` (Web of Science `.xls` exports), and `pymupdf`
 (full-text extraction).
